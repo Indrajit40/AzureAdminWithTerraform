@@ -18,12 +18,26 @@ resource "azurerm_resource_group" "rg" {
   name     = "RG11"
   location = "eastus2"
 
-resource "azurerm_resource_group" "rg" {
+  tags = {
+    Environment = "Terraform Getting Started"
+    Team = "Devops"
+}
+}
+resource "azurerm_resource_group" "rg2" {
   name     = "RG12"
   location = "eastus2"
 
   tags = {
     Environment = "Terraform Getting Started"
-    Team = "DevOps"
+    Team = "Devops"
+  }
+}
+resource "azurerm_resource_group" "rg1" {
+  name     = "RG13"
+  location = "eastus2"
+
+  tags = {
+    Environment = "Testing RG"
+    Team = "Azure admin"
   }
 }
