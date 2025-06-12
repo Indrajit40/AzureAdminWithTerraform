@@ -25,3 +25,104 @@ tags = {
 }
 }
 
+#Configure Virtual Network
+
+resource "azurerm_virtual_network" "vnet" {
+  name                = "example-vnet"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  address_space       = ["10.0.0.0/16"]
+}
+
+#configure the subnet1
+
+resource "azurerm_subnet" "subnet" {
+  name                 = "example-subnet"
+  resource_group_name  = azurerm_resource_group.rg.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.1.0/24"]
+}
+
+#Configure the Network Secuirty Group
+
+resource "azurerm_network_security_group" "nsg" {
+  name                = "example-nsg"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+}
+
+resource "azurerm_network_security_rule" "ssh" {
+  name                        = "AllowSSH"
+  priority                    = 100
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "22"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  network_security_group_name = azurerm_network_security_group.nsg.name
+  resource_group_name         = azurerm_resource_group.rg.name  
+}
+
+# Create public IP address   (this blcok can remove while only private IP)
+resource "azurerm_public_ip" "public_ip" {
+  name                = "myPublicIP"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  allocation_method   = "Dynamic"
+
+}
+
+
+#Configure Netwrok Interface Card (NIC)
+
+
+resource "azurerm_network_interface" "nic" {
+  name                = "example-nic"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  ip_configuration {
+    name                          = "example-ipconfig"
+    subnet_id                     = azurerm_subnet.subnet.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
+#Define Ubuntu VM
+
+resource "azurerm_linux_virtual_machine" "vm" {
+  name                = "example-vm"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  size                = "Standard_B1s"
+  network_interface_ids = [azurerm_network_interface.nic.id]
+
+  computer_name  = "example-vm"
+  admin_username = "sysadmin"
+  admin_password = "Password123#"
+  disable_password_authentication = false
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+  
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
+    version   = "latest"
+  }
+}
+
+#Show output VM public IP address
+output "vm_public_ip" {
+  value = azurerm_linux_virtual_machine.vm.public_ip_address
+}
+
+
+
+
