@@ -109,6 +109,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   admin_username      = "sysadmin"
   network_interface_ids = [azurerm_network_interface.nic[count.index].id]
   admin_password      = "Password123$"
+  disable_password_authentication = false
 
   os_disk {
     caching              = "ReadWrite"
