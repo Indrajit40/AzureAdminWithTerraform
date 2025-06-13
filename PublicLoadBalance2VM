@@ -44,6 +44,7 @@ resource "azurerm_public_ip" "public_ip" {
   allocation_method   = "Static"
   sku                 = "Standard"
 }
+
 #config Loadbalancer
 
 resource "azurerm_lb" "lb" {
@@ -105,9 +106,9 @@ resource "azurerm_linux_virtual_machine" "vm" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   size                = "Standard_B1s"
-  admin_username      = "azureuser"
+  admin_username      = "sysadmin"
   network_interface_ids = [azurerm_network_interface.nic[count.index].id]
-  admin_password      = "P@ssword1234!"
+  admin_password      = "Password123$"
 
   os_disk {
     caching              = "ReadWrite"
