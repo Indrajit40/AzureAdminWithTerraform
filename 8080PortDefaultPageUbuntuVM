@@ -4,15 +4,20 @@
 #Outputs the public IP address of the VM so you can access the website.
 
 
+#azure provider 
 
 provider "azurerm" {
   features {}
 }
 
+#Resource group
+
 resource "azurerm_resource_group" "rg" {
   name     = "ubuntu-vm-rg"
   location = "East US"
 }
+
+#confing VNET
 
 resource "azurerm_virtual_network" "vnet" {
   name                = "ubuntu-vnet"
@@ -21,6 +26,8 @@ resource "azurerm_virtual_network" "vnet" {
   resource_group_name = azurerm_resource_group.rg.name
 }
 
+#config subnet 
+
 resource "azurerm_subnet" "subnet" {
   name                 = "ubuntu-subnet"
   resource_group_name  = azurerm_resource_group.rg.name
@@ -28,14 +35,34 @@ resource "azurerm_subnet" "subnet" {
   address_prefixes     = ["10.0.1.0/24"]
 }
 
+#config nsg
+
 resource "azurerm_network_security_group" "nsg" {
   name                = "ubuntu-nsg"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
+}
 
-  security_rule {
+#allow SSH (port 22)
+resource "azurerm_network_security_rule" "ssh" {
+  name                        = "AllowSSH"
+  priority                    = 100
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "22"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  network_security_group_name = azurerm_network_security_group.nsg.name
+  resource_group_name         = azurerm_resource_group.rg.name
+}
+
+# allow 8080 port
+
+  resource "azurerm_network_security_rule" "allow_8080" {
     name                       = "Allow-8080"
-    priority                   = 100
+    priority                   = 200
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
@@ -43,13 +70,19 @@ resource "azurerm_network_security_group" "nsg" {
     destination_port_range     = "8080"
     source_address_prefix      = "*"
     destination_address_prefix = "*"
+    network_security_group_name = azurerm_network_security_group.nsg.name
+    resource_group_name         = azurerm_resource_group.rg.name
+
   }
-}
+
+# Associate NSG with Subnet
 
 resource "azurerm_subnet_network_security_group_association" "nsg_assoc" {
   subnet_id                 = azurerm_subnet.subnet.id
   network_security_group_id = azurerm_network_security_group.nsg.id
 }
+
+#config nic
 
 resource "azurerm_network_interface" "nic" {
   name                = "ubuntu-nic"
@@ -64,6 +97,8 @@ resource "azurerm_network_interface" "nic" {
   }
 }
 
+#config public ip address
+
 resource "azurerm_public_ip" "public_ip" {
   name                = "ubuntu-public-ip"
   location            = azurerm_resource_group.rg.location
@@ -71,16 +106,20 @@ resource "azurerm_public_ip" "public_ip" {
   allocation_method   = "Dynamic"
 }
 
+#confing vm
+
 resource "azurerm_linux_virtual_machine" "vm" {
   name                = "ubuntu-vm"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   size                = "Standard_B1s"
-  admin_username      = "azureuser"
+  admin_username      = "sysadmin"
   network_interface_ids = [
     azurerm_network_interface.nic.id,
   ]
-  admin_password = "P@ssword1234!" # Use SSH key in production
+  computer_name  = "ubuntu-vm"
+  admin_password = "Password123#"
+  disable_password_authentication = false
 
   os_disk {
     caching              = "ReadWrite"
@@ -106,11 +145,12 @@ EOF
 }
 
 output "public_ip_address" {
-  value = azurerm_public_ip.public_ip.ip_address
+  value = azurerm_linux_virtual_machine.vm.public_ip_address
   description = "Public IP address of the Ubuntu VM"
 }
 
 output "website_url" {
-  value = "http://${azurerm_public_ip.public_ip.ip_address}:8080"
+  value = "http://${azurerm_linux_virtual_machine.vm.public_ip_address}:8080"
+ # curl "http://${azurerm_linux_virtual_machine.vm.public_ip_address}:8080"
   description = "URL to access the default website"
 }
