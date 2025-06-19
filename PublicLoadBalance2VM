@@ -1,93 +1,86 @@
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 3.0.2"
-    }
-  }
-  required_version = ">= 1.1.0"
-}
-
+# Configure the Azure provider
 provider "azurerm" {
   features {}
 }
 
-# Resource Group
-resource "azurerm_resource_group" "rg" {
-  name     = "rg-loadbalancer-demo"
+# Create a resource group
+resource "azurerm_resource_group" "example" {
+  name     = "loadbalancer-rg"
   location = "East US"
 }
 
-# Virtual Network
-resource "azurerm_virtual_network" "vnet" {
-  name                = "vnet-demo"
+# Create a virtual network
+resource "azurerm_virtual_network" "example" {
+  name                = "lb-vnet"
   address_space       = ["10.0.0.0/16"]
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
 }
 
-# Subnet
-resource "azurerm_subnet" "subnet" {
-  name                 = "subnet-demo"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.vnet.name
+# Create a subnet
+resource "azurerm_subnet" "example" {
+  name                 = "lb-subnet"
+  resource_group_name  = azurerm_resource_group.example.name
+  virtual_network_name = azurerm_virtual_network.example.name
   address_prefixes     = ["10.0.1.0/24"]
 }
 
-# Public IP for Load Balancer
-resource "azurerm_public_ip" "lb_public_ip" {
+# Create a public IP for the load balancer
+resource "azurerm_public_ip" "example" {
   name                = "lb-public-ip"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
   allocation_method   = "Static"
   sku                 = "Standard"
 }
 
-# Load Balancer
-resource "azurerm_lb" "lb" {
-  name                = "public-lb"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+# Create the load balancer
+resource "azurerm_lb" "example" {
+  name                = "example-lb"
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
   sku                 = "Standard"
 
   frontend_ip_configuration {
     name                 = "PublicIPAddress"
-    public_ip_address_id = azurerm_public_ip.lb_public_ip.id
+    public_ip_address_id = azurerm_public_ip.example.id
   }
 }
 
-# Backend Address Pool
-resource "azurerm_lb_backend_address_pool" "bepool" {
-  loadbalancer_id = azurerm_lb.lb.id
-  name            = "backend-pool"
+# Create a backend address pool
+resource "azurerm_lb_backend_address_pool" "example" {
+  loadbalancer_id = azurerm_lb.example.id
+  name            = "BackEndAddressPool"
 }
 
-# Health Probe
-resource "azurerm_lb_probe" "probe" {
-  loadbalancer_id = azurerm_lb.lb.id
-  name            = "http-probe"
-  port            = 80
-  protocol        = "Http"
-  request_path    = "/"
+# Create a health probe
+resource "azurerm_lb_probe" "example" {
+  loadbalancer_id     = azurerm_lb.example.id
+  name                = "http-probe"
+  port                = 80
+  protocol            = "Http"
+  request_path        = "/"
+  interval_in_seconds = 5
+  number_of_probes    = 2
 }
 
-# Load Balancing Rule
-resource "azurerm_lb_rule" "lbrule" {
-  loadbalancer_id                = azurerm_lb.lb.id
-  name                           = "http-rule"
+# Create a load balancing rule
+resource "azurerm_lb_rule" "example" {
+  loadbalancer_id                = azurerm_lb.example.id
+  name                           = "LBRule"
   protocol                       = "Tcp"
   frontend_port                  = 80
   backend_port                   = 80
   frontend_ip_configuration_name = "PublicIPAddress"
-  backend_address_pool_id        = azurerm_lb_backend_address_pool.bepool.id
-  probe_id                       = azurerm_lb_probe.probe.id
+  backend_address_pool_ids       = [azurerm_lb_backend_address_pool.example.id]
+  probe_id                       = azurerm_lb_probe.example.id
 }
 
-# Network Security Group for VMs
-resource "azurerm_network_security_group" "nsg" {
-  name                = "vm-nsg"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+# Create a network security group with HTTP rule
+resource "azurerm_network_security_group" "example" {
+  name                = "lb-nsg"
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
 
   security_rule {
     name                       = "AllowHTTP"
@@ -114,46 +107,46 @@ resource "azurerm_network_security_group" "nsg" {
   }
 }
 
-# Network Interfaces for VMs
-resource "azurerm_network_interface" "nic" {
+# Create network interfaces for VMs
+resource "azurerm_network_interface" "example" {
   count               = 3
   name                = "nic-${count.index}"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.subnet.id
+    subnet_id                     = azurerm_subnet.example.id
     private_ip_address_allocation = "Dynamic"
   }
 }
 
-# Associate NSG with NICs
-resource "azurerm_network_interface_security_group_association" "nsg_assoc" {
-  count                     = 3
-  network_interface_id      = azurerm_network_interface.nic[count.index].id
-  network_security_group_id = azurerm_network_security_group.nsg.id
-}
-
-# Add NICs to Backend Pool
-resource "azurerm_network_interface_backend_address_pool_association" "nic_pool_assoc" {
+# Associate network interfaces with backend pool
+resource "azurerm_network_interface_backend_address_pool_association" "example" {
   count                   = 3
-  network_interface_id    = azurerm_network_interface.nic[count.index].id
+  network_interface_id    = azurerm_network_interface.example[count.index].id
   ip_configuration_name   = "internal"
-  backend_address_pool_id = azurerm_lb_backend_address_pool.bepool.id
+  backend_address_pool_id = azurerm_lb_backend_address_pool.example.id
 }
 
-# Virtual Machines
-resource "azurerm_linux_virtual_machine" "vm" {
+# Associate network interfaces with NSG
+resource "azurerm_network_interface_security_group_association" "example" {
+  count                     = 3
+  network_interface_id      = azurerm_network_interface.example[count.index].id
+  network_security_group_id = azurerm_network_security_group.example.id
+}
+
+# Create 3 virtual machines
+resource "azurerm_linux_virtual_machine" "example" {
   count                           = 3
   name                            = "vm-${count.index}"
-  resource_group_name             = azurerm_resource_group.rg.name
-  location                        = azurerm_resource_group.rg.location
+  resource_group_name             = azurerm_resource_group.example.name
+  location                        = azurerm_resource_group.example.location
   size                            = "Standard_B1s"
   admin_username                  = "adminuser"
-  network_interface_ids           = [azurerm_network_interface.nic[count.index].id]
+  admin_password                  = "P@ssw0rd1234!" # In production, use SSH keys instead
   disable_password_authentication = false
-  admin_password                  = "P@ssw0rd1234!"
+  network_interface_ids           = [azurerm_network_interface.example[count.index].id]
 
   os_disk {
     caching              = "ReadWrite"
@@ -162,39 +155,28 @@ resource "azurerm_linux_virtual_machine" "vm" {
 
   source_image_reference {
     publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
     version   = "latest"
   }
 
-  custom_data = base64encode(<<EOF
-#!/bin/bash
-sudo apt-get update
-sudo apt-get install -y apache2
-sudo systemctl start apache2
-sudo systemctl enable apache2
-echo "<h1>Hello from VM ${count.index}</h1>" | sudo tee /var/www/html/index.html
-EOF
+  # Install NGINX and configure it to return the hostname
+  custom_data = base64encode(<<-EOF
+    #!/bin/bash
+    apt-get update
+    apt-get install -y nginx
+    echo "Hello from $(hostname)" > /var/www/html/index.html
+    systemctl restart nginx
+  EOF
   )
 }
 
-# Outputs
+# Output the load balancer public IP
 output "load_balancer_public_ip" {
-  description = "Public IP address of the Load Balancer"
-  value       = azurerm_public_ip.lb_public_ip.ip_address
+  value = azurerm_public_ip.example.ip_address
 }
 
+# Output the VM private IPs
 output "vm_private_ips" {
-  description = "Private IP addresses of the VMs"
-  value       = [for nic in azurerm_network_interface.nic : nic.ip_configuration[0].private_ip_address]
-}
-
-output "vm_names" {
-  description = "Names of the created VMs"
-  value       = azurerm_linux_virtual_machine.vm[*].name
-}
-
-output "load_balancer_url" {
-  description = "URL to access the load balanced service"
-  value       = "http://${azurerm_public_ip.lb_public_ip.ip_address}"
+  value = [for nic in azurerm_network_interface.example : nic.ip_configuration[0].private_ip_address]
 }
