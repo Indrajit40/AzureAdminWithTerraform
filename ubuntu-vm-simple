@@ -14,7 +14,7 @@ provider "azurerm" {
 
 # 1. Resource Group
 resource "azurerm_resource_group" "rg" {
-  name     = "rg-terraform-ubuntu"
+  name     = "class1"
   location = "East US"
 }
 
