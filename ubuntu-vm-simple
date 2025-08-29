@@ -34,7 +34,53 @@ resource "azurerm_subnet" "subnet" {
   address_prefixes     = ["10.0.1.0/24"]
 }
 
-# 4. Public IP
+# 4. Network Security Group (Allow SSH 22 and custom 8080)
+resource "azurerm_network_security_group" "nsg" {
+  name                = "nsg-terraform"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  # Allow SSH
+  security_rule {
+    name                       = "Allow-SSH"
+    priority                   = 1001
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  # Allow Custom Port 8080
+  security_rule {
+    name                       = "Allow-Custom-8080"
+    priority                   = 1002
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "8080"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  # Deny all other inbound traffic
+  security_rule {
+    name                       = "Deny-All-Inbound"
+    priority                   = 4096
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+}
+
+# 5. Public IP
 resource "azurerm_public_ip" "pip" {
   name                = "pip-terraform"
   location            = azurerm_resource_group.rg.location
@@ -42,7 +88,7 @@ resource "azurerm_public_ip" "pip" {
   allocation_method   = "Dynamic"
 }
 
-# 5. Network Interface
+# 6. Network Interface
 resource "azurerm_network_interface" "nic" {
   name                = "nic-terraform"
   location            = azurerm_resource_group.rg.location
@@ -56,7 +102,13 @@ resource "azurerm_network_interface" "nic" {
   }
 }
 
-# 6. Virtual Machine
+# 7. Attach NSG to NIC
+resource "azurerm_network_interface_security_group_association" "nic_nsg" {
+  network_interface_id      = azurerm_network_interface.nic.id
+  network_security_group_id = azurerm_network_security_group.nsg.id
+}
+
+# 8. Virtual Machine (Ubuntu 24.04 LTS)
 resource "azurerm_linux_virtual_machine" "vm" {
   name                = "ubuntu-vm"
   location            = azurerm_resource_group.rg.location
@@ -73,8 +125,8 @@ resource "azurerm_linux_virtual_machine" "vm" {
 
   source_image_reference {
     publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-focal"
-    sku       = "20_04-lts"
+    offer     = "0001-com-ubuntu-server-noble"
+    sku       = "24_04-lts"
     version   = "latest"
   }
 
